@@ -4,69 +4,76 @@ public class FinishZone : MonoBehaviour
 {
     private void OnTriggerEnter(Collider other)
     {
-        // DEBUG: Log EVERYTHING that enters
-        Debug.Log("=== FINISH ZONE TRIGGER ===");
-        Debug.Log("Object: " + other.name);
-        Debug.Log("Tag: " + other.tag);
-        Debug.Log("Layer: " + other.gameObject.layer);
-        Debug.Log("Position: " + other.transform.position);
-
         if (other.CompareTag("Player"))
         {
-            Debug.Log("✓ PLAYER detected in finish zone!");
             CompleteLevel();
-        }
-        else
-        {
-            Debug.Log("✗ Not player - wrong tag");
         }
     }
 
     private void CompleteLevel()
     {
-        Debug.Log("=== COMPLETING LEVEL ===");
+        Debug.Log("=== FINISH ZONE TRIGGERED ===");
 
-        // Try to get timer
-        GameTimer timer = FindObjectOfType<GameTimer>();
+        // Get timer
+        GameTimer timer = GameTimer.Instance;
         if (timer == null)
         {
-            Debug.LogError("❌ GameTimer not found!");
+            Debug.LogError("GameTimer not found!");
             return;
         }
 
+        // Stop timer and get final time
         timer.StopTimer();
         float finalTime = timer.GetCurrentTime();
-        Debug.Log("Final time: " + GameTimer.FormatTime(finalTime));
+        Debug.Log($"Final time: {GameTimer.FormatTime(finalTime)}");
 
-        // Try to show win screen
-        UIManager uiManager = FindObjectOfType<UIManager>();
-        if (uiManager == null)
-        {
-            Debug.LogError("❌ UIManager not found!");
-            return;
-        }
-
-        // Check high score
-        HighScoreManager highScore = FindObjectOfType<HighScoreManager>();
+        // Check for new record using HighScoreManager
         bool isNewRecord = false;
+        HighScoreManager highScoreManager = HighScoreManager.Instance;
 
-        if (highScore != null)
+        if (highScoreManager != null)
         {
-            isNewRecord = highScore.CheckNewRecord(finalTime);
+            isNewRecord = highScoreManager.CheckNewRecord(finalTime);
+            Debug.Log($"New record? {isNewRecord}");
+
+            // Also add to high score list
+            int position = highScoreManager.AddScore(finalTime);
+            Debug.Log($"Position on leaderboard: #{position}");
         }
         else
         {
-            Debug.LogWarning("HighScoreManager not found, checking manually");
+            Debug.LogWarning("HighScoreManager not found, using PlayerPrefs fallback");
             float bestTime = PlayerPrefs.GetFloat("BestTime", float.MaxValue);
             if (finalTime < bestTime)
             {
                 PlayerPrefs.SetFloat("BestTime", finalTime);
+                PlayerPrefs.Save();
                 isNewRecord = true;
             }
         }
 
-        Debug.Log("New Record? " + isNewRecord);
-        uiManager.ShowWinScreen(finalTime, isNewRecord);
-        Debug.Log("✓ Win screen should be visible");
+        // Show win screen
+        UIManager uiManager = FindObjectOfType<UIManager>();
+        if (uiManager != null)
+        {
+            uiManager.ShowWinScreen(finalTime, isNewRecord);
+        }
+        else
+        {
+            Debug.LogError("UIManager not found!");
+        }
+
+        // Show high score panel (TAB panel)
+        HighScoreUI highScoreUI = FindObjectOfType<HighScoreUI>();
+        if (highScoreUI != null)
+        {
+            highScoreUI.ShowResultsScreen(finalTime);
+        }
+        else
+        {
+            Debug.LogWarning("HighScoreUI not found - TAB leaderboard won't show");
+        }
+
+        Debug.Log("=== LEVEL COMPLETE ===");
     }
 }
